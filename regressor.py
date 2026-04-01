@@ -1,10 +1,3 @@
-"""
-Задача: Регрессия (предсказание вероятности сердечно-сосудистого заболевания)
-Датасет: cardiovascular_data.csv (1500 записей, 7 признаков, бинарная целевая переменная)
-Модель: XGBRegressor с objective='reg:logistic'
-Цель: Получить вероятности заболевания и оценить качество предсказаний
-"""
-
 import pandas as pd
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import mean_absolute_error, roc_auc_score
@@ -35,10 +28,7 @@ print(f"Размер тестовой выборки: {x_test.shape}")
 model = XGBRegressor(
     n_estimators=500,
     max_depth=3,
-    learning_rate=0.01,
-    objective='reg:logistic',
-    random_state=42,
-    eval_metric='logloss'
+    learning_rate=0.01
 )
 
 # Сетка параметров

@@ -39,18 +39,12 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 # 3. Обучение XGBoost
-model = xgb.XGBClassifier(
-    n_estimators=100,
-    max_depth=5,
-    learning_rate=0.1,
-    random_state=42,
-    eval_metric='logloss'
-)
+model = xgb.XGBClassifier()
 model.fit(X_train, y_train)
 
 # 4. Оценка
 y_pred = model.predict(X_test)
-print(f"Точность: {accuracy_score(y_test, y_pred):.4f}")
+print(f"\nТочность: {accuracy_score(y_test, y_pred):.4f}")
 print("\nМатрица ошибок:")
 print(*confusion_matrix(y_test, y_pred))
 print("\nОтчёт по классификации:")
