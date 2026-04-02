@@ -1,46 +1,94 @@
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
+from sklearn.datasets import load_iris
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression, Ridge, Lasso
-from sklearn.metrics import mean_squared_error, r2_score
-import time
+from sklearn.preprocessing import StandardScaler
 
-# Генерация синтетических данных (одномерный случай)
-np.random.seed(42)
-X_simple = np.random.rand(100, 1) * 10  # признак от 0 до 10
-y_simple = 2.5 * X_simple.squeeze() + 1.2 + np.random.randn(100) * 1.5  # y = 2.5x + 1.2 + шум
+# Загрузка данных
+iris = load_iris()
+X, y = iris.data, iris.target
 
-# Для многомерного примера используем встроенный набор данных (диабет)
-from sklearn.datasets import load_diabetes
-diabetes = load_diabetes()
-X_multi = diabetes.data
-y_multi = diabetes.target
+# Масштабирование
+scaler = StandardScaler()
+X = scaler.fit_transform(X)
 
-# Разделение на обучающую и тестовую выборки
-X_simple_train, X_simple_test, y_simple_train, y_simple_test = train_test_split(
-    X_simple, y_simple, test_size=0.2, random_state=42
-)
-X_multi_train, X_multi_test, y_multi_train, y_multi_test = train_test_split(
-    X_multi, y_multi, test_size=0.2, random_state=42
-)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
 
+class MyLogisticRegression:
+    def __init__(self, learning_rate=0.1, n_iters=1000, с=1.0):
+        self.lr = learning_rate
+        self.n_iters = n_iters
+        self.с = 1/с
+        self.weights = None
+        self.bias = None
 
-class LinearRegression:
-    def __init__(self, fit_intercept):
-        self.fit_intercept = fit_intercept
-        self.coef_ = None
-        self.intercept_ = None
+    def _sigmoid(self, z):
+        return 1 / (1 + np.exp(-z))
 
     def fit(self, X, y):
-        if self.fit_intercept:
-            X_design = np.hstack([np.ones((X.shape[0], 1)), X])
-        else:
-            X_design = X
+        n_samples, n_features = X.shape
 
-        XtX = X_design.T @ X_design
-        Xty = X_design.T @ y
-        self.weights = np.linalg.solve(XtX, Xty)
+        self.weights = np.zeros(n_features)
+        self.bias = 0
 
-        if self.fit_intercept:
-            self.intercept_ = self.weights[0]
+        # Градиентный спуск
+        for _ in range(self.n_iters):
+            # Линейная комбинация
+            linear_model = X @ self.weights + self.bias
+
+            y_pred = self._sigmoid(linear_model)
+
+            # Градиенты
+            dw = (X.T @ (y_pred - y)) + 2 * self.с * self.weights # L2
+            db = np.sum(y_pred - y)
+
+            # Обновление параметров
+            self.weights -= self.lr * dw
+            self.bias -= self.lr * db
+
+    def predict_proba(self, X):
+        linear_model = X @ self.weights + self.bias
+        return self._sigmoid(linear_model)
+
+    def predict(self, X, threshold=0.5):
+        proba = self.predict_proba(X)
+        return (proba >= threshold).astype(int)
+
+
+class OneVsRestLogistic:
+    def __init__(self, learning_rate=0.1, n_iters=1000, с=1):
+        self.lr = learning_rate
+        self.n_iters = n_iters
+        self.с = с
+        self.models = []        # список бинарных классификаторов
+        self.classes_ = None
+
+    def fit(self, X, y):
+        self.classes_ = np.unique(y)
+        # Для каждого класса создаём и обучаем бинарную модель
+        for c in self.classes_:
+            # Преобразуем метки: 1 для класса c, 0 для всех остальных
+            y_binary = (y == c).astype(int)
+            model = MyLogisticRegression(learning_rate=self.lr, n_iters=self.n_iters, с=self.с)
+            model.fit(X, y_binary)
+            self.models.append(model)
+
+    def predict_proba(self, X):
+        # Возвращает вероятности для каждого класса (матрица n_samples x n_classes)
+        probas = np.column_stack([model.predict_proba(X) for model in self.models])
+        return probas
+
+    def predict(self, X):
+        probas = self.predict_proba(X)
+        return self.classes_[np.argmax(probas, axis=1)]
+
+my_lr = OneVsRestLogistic(learning_rate=0.1, n_iters=100, с=1000)
+my_lr.fit(X_train, y_train)
+y_pred_my = my_lr.predict(X_test)
+print(f"Моя softmax точность: {accuracy_score(y_test, y_pred_my):.3f}")
+
+sk_lr = LogisticRegression()
+sk_lr.fit(X_train, y_train)
+y_pred_sk = sk_lr.predict(X_test)
+print(f"Sklearn softmax точность: {accuracy_score(y_test, y_pred_sk):.3f}")
