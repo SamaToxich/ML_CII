@@ -65,9 +65,6 @@ class MyKNN:
 my_knn = MyKNN(3)
 my_knn.fit(X_train, y_train)
 y_pred_my = my_knn.predict(X_test)
-acc_my = accuracy_score(y_test, y_pred_my)
-print(f"\nТочность собственного k-NN (k=3): {acc_my:.2f}")
-print("Отчёт классификации:\n", classification_report(y_test, y_pred_my))
 
 # -------------------------------
 # 5. Обучение и оценка sklearn k-NN
@@ -75,6 +72,12 @@ print("Отчёт классификации:\n", classification_report(y_test, 
 sk_knn = KNeighborsClassifier(n_neighbors=3)
 sk_knn.fit(X_train, y_train)
 y_pred_sk = sk_knn.predict(X_test)
+
+# Вывод
+acc_my = accuracy_score(y_test, y_pred_my)
+print(f"\nТочность собственного k-NN (k=3): {acc_my:.2f}")
+print("Отчёт классификации:\n", classification_report(y_test, y_pred_my))
+
 acc_sk = accuracy_score(y_test, y_pred_sk)
 print(f"\nТочность sklearn k-NN (k=3): {acc_sk:.2f}")
 print("Отчёт классификации:\n", classification_report(y_test, y_pred_sk))
@@ -82,7 +85,6 @@ print("Отчёт классификации:\n", classification_report(y_test, 
 # -------------------------------
 # 6. Добавление нового класса
 # -------------------------------
-# Добавим класс "Ягоды" с новыми примерами.
 new_data = {
     'продукт': ['клубника', 'черника', 'малина'],
     'сладость': [5, 4, 5],
