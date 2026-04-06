@@ -2,8 +2,6 @@ import math
 import random
 import time
 import numpy as np
-from matplotlib import pyplot as plt
-from numpy.random import rand
 from sklearn.cluster import KMeans
 from sklearn.datasets import make_blobs
 from sklearn.metrics import silhouette_score
