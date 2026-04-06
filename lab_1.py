@@ -1,7 +1,9 @@
 import math
+import random
 import time
 import numpy as np
 from matplotlib import pyplot as plt
+from numpy.random import rand
 from sklearn.cluster import KMeans
 from sklearn.datasets import make_blobs
 from sklearn.metrics import silhouette_score
@@ -13,8 +15,6 @@ def euclidean_distance(p1,p2):
 
 def cdist(X, Y=None):
     """Вычисляет матрицу попарных расстояний.
-    Если Y=None, то расстояния между точками X и X (квадратная матрица).
-    X, Y — списки точек (каждая точка — список или кортеж координат).
     Возвращает список списков (матрицу) float."""
     if Y is None:
         Y = X
@@ -41,7 +41,7 @@ def prim_mst(dist_matrix):
     edges = []
 
     for _ in range(n - 1):
-        # Ищем минимальное ребро из посещённых вершин в непосещённые
+        # Ищем минимальное ребро из посещённых вершин в не посещённые
         min_weight = float('inf') # бесконечно большое число
         u, v = -1, -1
 
@@ -81,23 +81,19 @@ def kruskal_mst(points):
     parent = list(range(n))
     rank = [0] * n
 
-    def find(v):
-        while parent[v] != v:
-            parent[v] = parent[parent[v]]
-            v = parent[v]
-        return v
+    def find(x):
+        if parent[x] == x:
+            return x
+        parent[x] = find(parent[x])
+        return parent[x]
 
-    def union(v1, v2):
-        r1, r2, = find(v1), find(v2)
-        if r1 == r2:
+    def union(x, y):
+        x, y, = find(x), find(y)
+        if x == y:
             return False
-        if rank[r1] < rank[r2]:
-            parent[r1] = r2
-        elif rank[1] > rank[2]:
-            parent[r2] = r1
-        else:
-            parent[r2] = r1
-            rank[r1] += 1
+        if random.randint(1, 10) % 2 == 0:
+            x, y = y, x
+        parent[x] = y
         return True
 
     mst_edges = []
@@ -203,7 +199,7 @@ def my_kmeans(X, k, max_iters=100, tol=1e-4, random_state=None):
     return labels, centroids
 
 # ------------------------------------------------------------
-# 3. Функция для оценки качества (силуэт и инерция)
+# 3. Функция для оценки качества
 # ------------------------------------------------------------
 def evaluate_clustering(X, labels, centroids=None):
     """
@@ -312,35 +308,6 @@ def run_experiment():
         print("-" * 80)
 
     return results
-
-# ------------------------------------------------------------
-# 6. Визуализация результатов для одного теста (пример)
-# ------------------------------------------------------------
-def visualize_example():
-    # Возьмём тест с тремя блобами
-    X, _ = make_blobs(n_samples=150, centers=3, cluster_std=0.8, random_state=42)
-    K = 3
-
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-
-    # MST кластеризация
-    labels_mst = mst_clustering(X, K)
-    axes[0].scatter(X[:,0], X[:,1], c=labels_mst, cmap='viridis', alpha=0.7)
-    axes[0].set_title('MST clustering')
-
-    # Моя реализация K-means
-    labels_my, _ = my_kmeans(X, K, random_state=42)
-    axes[1].scatter(X[:,0], X[:,1], c=labels_my, cmap='viridis', alpha=0.7)
-    axes[1].set_title('My K-means')
-
-    # Scikit-learn K-means
-    kmeans_sk = KMeans(n_clusters=K, random_state=42, n_init=10)
-    labels_sk = kmeans_sk.fit_predict(X)
-    axes[2].scatter(X[:,0], X[:,1], c=labels_sk, cmap='viridis', alpha=0.7)
-    axes[2].set_title('Scikit-learn K-means')
-
-    plt.tight_layout()
-    plt.show()
 
 # ------------------------------------------------------------
 # Запуск эксперимента и визуализации

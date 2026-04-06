@@ -2,7 +2,7 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 
-df = pd.read_csv('clustering_data.csv')
+df = pd.read_csv('data/clustering_data.csv')
 
 print("\nПервые 5 строк:")
 print(df.head())
@@ -17,5 +17,5 @@ kmeans = KMeans(n_clusters=2)
 clusters = kmeans.fit_predict(X_scaled)
 
 ct = pd.crosstab(y, clusters)
-print("\nТаблица сопряжения (диагноз vs кластер):")
+print("\nТаблица схождения:")
 print(ct)

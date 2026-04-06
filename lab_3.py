@@ -5,7 +5,7 @@ from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-df = pd.read_csv('cardiovascular_data.csv')
+df = pd.read_csv('data/cardiovascular_data.csv')
 
 X, y = df.drop('disease', axis=1), df['disease']
 
