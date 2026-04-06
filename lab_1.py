@@ -312,4 +312,3 @@ def run_experiment():
 # ------------------------------------------------------------
 if __name__ == "__main__":
     results = run_experiment()
-    visualize_example()
