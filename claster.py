@@ -1,4 +1,6 @@
+import numpy as np
 import pandas as pd
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 
@@ -13,9 +15,12 @@ y = df['group']
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
-kmeans = KMeans(n_clusters=2)
+kmeans = KMeans(len(np.unique(y)), random_state=42)
 clusters = kmeans.fit_predict(X_scaled)
+print(clusters)
 
 ct = pd.crosstab(y, clusters)
-print("\nТаблица схождения:")
-print(ct)
+print(f"\nТаблица схождения:\n{ct}")
+print(f'Точность: {accuracy_score(y, clusters)}')
+print(confusion_matrix(y, clusters))
+print(f'{classification_report(y, clusters)}')
