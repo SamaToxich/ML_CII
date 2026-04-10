@@ -1,26 +1,37 @@
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 
 df = pd.read_csv('data/clustering_data.csv')
 
-print("\nПервые 5 строк:")
-print(df.head())
-
 X = df.drop('group', axis=1)
 y = df['group']
 
 scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
+X = scaler.fit_transform(X)
 
-kmeans = KMeans(len(np.unique(y)), random_state=42)
-clusters = kmeans.fit_predict(X_scaled)
-print(clusters)
+k_range = range(2,100)
+indexCX = []
+cnt_down = 0
 
-ct = pd.crosstab(y, clusters)
-print(f"\nТаблица схождения:\n{ct}")
-print(f'Точность: {accuracy_score(y, clusters)}')
-print(confusion_matrix(y, clusters))
-print(f'{classification_report(y, clusters)}')
+for k in k_range:
+    kmeans = KMeans(k, random_state=42)
+    labels = kmeans.fit_predict(X)
+    cur_CX = silhouette_score(X, labels) / kmeans.inertia_ * ((X.shape[0] - k) / (k-1))
+    indexCX.append(cur_CX)
+
+    if cur_CX < max(indexCX):
+        cnt_down += 1
+        if cnt_down >= 3:
+            break
+
+best_k = k_range[np.argmax(indexCX)]
+
+model = KMeans(best_k, random_state=42)
+clusters = model.fit_predict(X)
+
+print(f'\nЛучшее K: {best_k}')
+print(f'Инерция: {model.inertia_}')
+print(f'Силуэт: {silhouette_score(X, clusters)}')
