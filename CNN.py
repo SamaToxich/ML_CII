@@ -6,7 +6,7 @@ alpha = 2
 iterations = 200
 pixels_pre_image = 28*28
 num_labels = 10
-batch_size = 128
+batch_size = 100
 
 rows_input = 28
 cols_input = 28
@@ -123,7 +123,7 @@ for j in range(iterations):
         true_labels = np.argmax(test_labels[i:i+1], axis=1)
         test_correct_cnt += np.sum(predictions == true_labels)
 
-    if(j % 10 == 0):
+    if(j % 1 == 0):
         sys.stdout.write("\n"+ \
                          "I:" + str(j) + \
                          " Test-Acc:"+str(test_correct_cnt/float(len(test_images)))+ \
