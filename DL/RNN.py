@@ -4,7 +4,7 @@ import pandas as pd
 from collections import Counter
 import math
 
-df = pd.read_csv('IMDB Dataset.csv')
+df = pd.read_csv('../data/IMDB Dataset.csv')
 df = df.values.tolist()
 
 raw_reviews = list()

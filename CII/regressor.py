@@ -4,7 +4,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix, classification_rep
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-df = pd.read_csv('data/cardiovascular_data.csv')
+df = pd.read_csv('../data/cardiovascular_data.csv')
 
 print("\nПервые 5 строк:")
 print(df.head())

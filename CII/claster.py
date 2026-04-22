@@ -4,7 +4,7 @@ from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 
-df = pd.read_csv('data/clustering_data.csv')
+df = pd.read_csv('../data/clustering_data.csv')
 
 X = df.drop('group', axis=1)
 y = df['group']

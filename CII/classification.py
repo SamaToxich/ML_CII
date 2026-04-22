@@ -4,7 +4,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
-df = pd.read_csv('data/medical_data.csv')
+df = pd.read_csv('../data/medical_data.csv')
 
 print("\nПервые 5 строк:")
 print(df.head())
