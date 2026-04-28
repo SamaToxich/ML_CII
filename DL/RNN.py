@@ -1,111 +1,117 @@
-import sys
-import numpy as np
-import pandas as pd
+import sys,random,math
 from collections import Counter
-import math
-
-df = pd.read_csv('../data/IMDB Dataset.csv')
-df = df.values.tolist()
-
-raw_reviews = list()
-raw_labels = list()
-for i in range(len(df)):
-    raw_reviews.append(df[i][0])
-    raw_labels.append(df[i][1])
-
-tokens = list(map(lambda x:set(x.split(" ")),raw_reviews))
-
-vocab = set()
-for sent in tokens:
-    for word in sent:
-        if len(word) > 0:
-            vocab.add(word)
-vocab = list(vocab)
-
-word2index = {}
-for i, word in enumerate(vocab):
-    word2index[word] = i
-
-input_dataset = list()
-for sent in tokens:
-    sent_indices = list()
-    for word in sent:
-        try:
-            sent_indices.append(word2index[word])
-        except:
-            ""
-    input_dataset.append(list(set(sent_indices)))
-
-target_dataset = list()
-for label in raw_labels:
-    if label == 'positive':
-        target_dataset.append(1)
-    else:
-        target_dataset.append(0)
+import numpy as np
+import re
+from nltk.tokenize import word_tokenize
 
 np.random.seed(1)
 
-alpha = 0.02
-iteration = 1
-hidden_size = 100
+def softmax(x_):
+    x = np.atleast_2d(x_)
+    temp = np.exp(x)
+    return temp / np.sum(temp, axis=1, keepdims=True)
 
-weights_1 = 0.2 * np.random.random((len(vocab), hidden_size)) - 0.1
-weights_2 = 0.2 * np.random.random((hidden_size, 1)) - 0.1
-correct, total = 0, 0
+def clean_text_nltk(text):
+    text = re.sub(r'<[^>]+>', ' ', text)
 
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
+    tokens = word_tokenize(text.lower())
+    tokens = [word for word in tokens if word.isalpha() and len(word) > 1]
+    return tokens
 
-def similar(target='beautiful'):
-    target_i = word2index[target]
-    scores = Counter()
-    for w, i in word2index.items():
-        raw_difference = weights_1[i] - (weights_1[target_i])
-        squared_difference = raw_difference * raw_difference
-        scores[w] = -math.sqrt(sum(squared_difference))
+def words2indices(sentence):
+    idx = list()
+    for word in sentence:
+        idx.append(word2index[word])
+    return idx
 
-    return scores.most_common(10)
+f = open('../data/qa1_single-supporting-fact_train.txt','r')
+raw = f.readlines()
+f.close()
 
-for iter in range(iteration):
+tokens = [clean_text_nltk(review) for review in raw[0:1000]]
 
-    for i in range(len(input_dataset) - 1000):
+vocab = set()
 
-        x, y = input_dataset[i], target_dataset[i]
+for sent in tokens:
+    for word in sent:
+        vocab.add(word)
 
-        layer_1 = sigmoid(np.sum(weights_1[x], axis=0))
+vocab = list(vocab)
 
-        layer_2 = sigmoid(layer_1 @ weights_2)
+word2index = {word: i for i, word in enumerate(vocab)}
 
-        layer_2_delta = layer_2 - y
-        layer_1_delta = layer_2_delta @ weights_2.T
+embed_size = 10
 
-        weights_1[x] -= layer_1_delta * alpha
-        weights_2 -= np.outer(layer_1,layer_2_delta) * alpha
+weights_1 = (np.random.rand(len(vocab), embed_size) - 0.5) * 0.1 # embed
+weights_2 = (np.random.rand(embed_size, len(vocab)) - 0.5) * 0.1 # decoder
 
-        if np.abs(layer_2_delta) < 0.5:
-            correct += 1
-        total += 1
+recurrent = np.eye(embed_size) # матрица для учета порядка слов
+start = np.zeros((1, embed_size))
 
-        if(i % 10 == 9):
-            progress = str(i/float(len(input_dataset)-1000))
-            sys.stdout.write('\rlter:'+str(iter+1) \
-                             +' Progress:'+progress[2:4] \
-                             +'.'+progress[4] \
-                             + '% Training Accuracy:' \
-                             + str(round(correct/float(total)*100)) + '%')
-    print()
+one_hot = np.eye(len(vocab))
 
-test_correct, test_total = 0, 0
-for i in range(len(input_dataset)-1000,len(input_dataset)):
+def predict(sent):
+    layers = list()
+    layer = {}
+    layer['hidden'] = start
+    layers.append(layer)
 
-    l = input_dataset[i]
-    target = target_dataset[i]
+    loss = 0
 
-    layer_1 = sigmoid(np.sum(weights_1[l],axis=0))
-    layer_2 = sigmoid(layer_1 @ weights_2)
+    preds = list()
+    for target_i in range(len(sent)):
 
-    if np.abs(layer_2 - target) < 0.5:
-        test_correct += 1
-    test_total += 1
+        layer = {}
+        layer['pred'] = softmax(layers[-1]['hidden'] @ weights_2)
 
-print("Test Accuracy:" + str(test_correct / float(test_total)))
+        loss += -np.log(layer['pred'][0][sent[target_i]])
+
+        layer['hidden'] = layers[-1]['hidden'] @ recurrent + weights_1[sent[target_i]]
+        layers.append(layer)
+    return layers, loss
+
+for iter in range(30000):
+    alpha = 0.001
+    sent = words2indices(tokens[iter%len(tokens)][1:])
+    layers, loss = predict(sent)
+
+    for i in reversed(range(len(layers))):
+        layer = layers[i]
+        target = sent[i-1]
+
+        if i > 0:
+            layer['output_delta'] = layer['pred'][0] - one_hot[target]
+            new_hidden_delta = layer['output_delta'] @ weights_2.T
+
+            if i == len(layers)-1:
+                layer['hidden_delta'] = new_hidden_delta
+            else:
+                layer['hidden_delta'] = new_hidden_delta + layers[i+1]['hidden_delta'] @ recurrent.T
+        else:
+            layer['hidden_delta'] = layers[i+1]['hidden_delta'] @ recurrent.T
+
+    start -= layers[0]['hidden_delta'] * alpha / float(len(sent))
+
+    for layers_i, layer in enumerate(layers[1:]):
+        weights_2 -= np.outer(layers[layers_i]['hidden'], layer['output_delta']) * alpha / float(len(sent))
+
+        embed_i = sent[layers_i]
+        weights_1[embed_i] -= layers[layers_i]['hidden_delta'] * alpha / float(len(sent))
+
+        recurrent -= np.outer(layers[layers_i]['hidden'], layer['hidden_delta']) * alpha / float(len(sent))
+
+    if(iter % 1000 == 0):
+        print("Perplexity:" + str(np.exp(loss/len(sent))))
+
+sent_index = 4
+l,_ = predict(words2indices(tokens[sent_index]))
+
+print(tokens[sent_index])
+
+for i,each_layer in enumerate(l[1:-1]):
+    input = tokens[sent_index][i]
+    true = tokens[sent_index][i+1]
+    pred = vocab[each_layer['pred'].argmax()]
+
+    print("Prev Input:" + input + (' ' * (12 - len(input))) + \
+          "True:" + true + (" " * (15 - len(true))) + "Pred:" + pred)

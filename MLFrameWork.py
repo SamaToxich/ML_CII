@@ -111,6 +111,10 @@ class Tensor(object):
                         new_grad[indices_[i]] += grad_[i]
                     self.creators[0].backward(Tensor(new_grad))
 
+                if(self.creation_op == "cross_entropy"):
+                    dx = self.softmax_output - self.target_dist
+                    self.creators[0].backward(Tensor(dx))
+
     def __repr__(self):
             return str(self.data.__repr__())
 
@@ -193,6 +197,22 @@ class Tensor(object):
             return new
         return Tensor(self.data[indices.data])
 
+    def cross_entropy(self, target_indices):
+        softmax_output = np.exp(self.data) / np.sum(np.exp(self.data), axis=len(self.data.shape)-1, keepdims=True)
+
+        t = target_indices.data.flatten()
+        p = softmax_output.reshape(len(t),-1)
+
+        target_dist = np.eye(p.shape[1])[t]
+        loss = -(np.log(p) * target_dist).sum(1).mean()
+
+        if self.autograd:
+            out = Tensor(loss,autograd=True,creators=[self],creation_op="cross_entropy")
+            out.softmax_output = softmax_output
+            out.target_dist = target_dist
+            return out
+        return Tensor(loss)
+
 class SGD(object):
     def __init__(self, tensors, alpha=0.1):
         self.tensors = tensors
@@ -235,6 +255,55 @@ class Linear(Layer):
         return input.mm(self.weight) + self.bias.expand(0, len(input.data))
 
 
+class Embedding(Layer):
+    def __init__(self, vocab_size, dim):
+        super().__init__()
+
+        self.vocab_size = vocab_size
+        self.dim = dim
+
+        self.weight = Tensor((np.random.rand(vocab_size, dim) - 0.5) / dim, autograd=True)
+        self.tensors.append(self.weight)
+
+    def forward(self, input):
+        return self.weight.index_select(input)
+
+
+class RNNCell(Layer):
+    def __init__(self, n_in, n_hide, n_out, activation='sigmoid'):
+        super().__init__()
+
+        self.n_in = n_in
+        self.n_hide = n_hide
+        self.n_out = n_out
+
+        if activation == 'sigmoid':
+            self.activation = Sigmoid()
+        elif activation == 'tanh':
+            self.activation == Tanh()
+        else:
+            raise Exception("Функция активации не найдена")
+
+        self.w_ih = Linear(n_in, n_hide)
+        self.w_hh = Linear(n_hide, n_hide)
+        self.w_ho = Linear(n_hide, n_out)
+
+        self.tensors += self.w_ih.get_tensors()
+        self.tensors += self.w_hh.get_tensors()
+        self.tensors += self.w_ho.get_tensors()
+
+    def forward(self, input, hidden):
+        combined = self.w_ih.forward(input) + self.w_hh.forward(hidden)
+
+        new_hidden = self.activation.forward(combined)
+
+        output = self.w_ho.forward(new_hidden)
+
+        return output, new_hidden
+
+    def init_hidden(self, batch_size=1):
+        return Tensor(np.zeros((batch_size, self.n_hide)), autograd=True)
+
 class Sequential(Layer):
     def __init__(self, layers = list()):
         super().__init__()
@@ -264,6 +333,14 @@ class MSELoss(Layer):
         return ((pred - target)*(pred-target)).sum(0)
 
 
+class CrossEntropyLoss(object):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, input, target):
+        return input.cross_entropy(target)
+
+
 class Tanh(Layer):
     def __init__(self):
         super().__init__()
@@ -286,18 +363,3 @@ class Softmax(Layer):
 
     def forward(self, input):
         return input.softmax()
-
-
-class Embedding(Layer):
-    def __init__(self, vocab_size, dim):
-        super().__init__()
-
-        self.vocab_size = vocab_size
-        self.dim = dim
-
-        weight = (np.random.rand(vocab_size, dim) - 0.5) / dim
-        self.weight = Tensor(weight, autograd=True)
-        self.tensors.append(self.weight)
-
-    def forward(self, input):
-        return self.weight.index_select(input)

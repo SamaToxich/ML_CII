@@ -87,10 +87,9 @@ target = np.zeros(negative+1)
 target[0] = 1
 
 df = pd.read_csv('../data/IMDB Dataset.csv')
-raw_reviews = df['review'].tolist()[0:25000]
+raw_reviews = df['review'].tolist()[0:5000]
 
 tokens = [clean_text_nltk(review) for review in raw_reviews]
-print(tokens)
 
 wordcnt = Counter()
 
