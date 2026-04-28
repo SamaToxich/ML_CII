@@ -10,12 +10,9 @@ class Tensor(object):
         self.autograd = autograd
         self.children = {}
         if id is None:
-            id = np.random.randint(1, 100_000)
+            id = np.random.randint(0, 1_000_000_000)
         self.id = id
-        if isinstance(data, np.ndarray):
-            self.shape = data.shape
-        else:
-            self.shape = np.array(data).shape
+
 
         if creators is not None:
             for x in creators:
@@ -35,9 +32,9 @@ class Tensor(object):
             if grad is None:
                 grad = Tensor(np.ones_like(self.data))
 
-            if grad_origin is not None:
-                if self.children[grad_origin.id] == 0:
-                    raise Exception("не можем выполнить обратное распространение более одного раза")
+            if(grad_origin is not None):
+                if(self.children[grad_origin.id] == 0):
+                    return
                 else:
                     self.children[grad_origin.id] -= 1
 
@@ -46,19 +43,19 @@ class Tensor(object):
             else:
                 self.grad += grad
 
+            assert grad.autograd == False
+
             if self.creators is not None and (self.all_children_grads_accounted_for() or grad_origin is None):
                 if self.creation_op == "add":
-                    self.creators[0].backward(grad)
-                    self.creators[1].backward(grad)
+                    self.creators[0].backward(self.grad, self)
+                    self.creators[1].backward(self.grad, self)
 
                 if self.creation_op == "neg":
                     self.creators[0].backward(self.grad.__neg__())
 
                 if self.creation_op == "sub":
-                    new = Tensor(self.grad.data)
-                    self.creators[0].backward(new, self)
-                    new = Tensor(self.grad.__neg__().data)
-                    self.creators[1].backward(new, self)
+                    self.creators[0].backward(Tensor(self.grad.data), self)
+                    self.creators[1].backward(Tensor(self.grad.__neg__().data), self)
 
                 if self.creation_op == "mul":
                     new = self.grad * self.creators[1]
@@ -94,15 +91,6 @@ class Tensor(object):
                     ones = Tensor(np.ones_like(self.grad.data))
                     self.creators[0].backward(self. grad * (ones - (self * self)))
 
-                if self.creation_op == "softmax":
-                    grad_input = np.zeros_like(self.data)
-                    for i in range(self.data.shape[0]):
-                        s = self.data[i].reshape(-1, 1)
-                        jacobian = np.diagflat(s) - s @ s.T
-                        grad_input[i] = self.grad.data[i] @ jacobian
-
-                    self.creators[0].backward(Tensor(grad_input))
-
                 if(self.creation_op == "index_select"):
                     new_grad = np.zeros_like(self.creators[0].data)
                     indices_ = self.index_select_indices.data.flatten()
@@ -137,14 +125,9 @@ class Tensor(object):
         return Tensor(self.data - other.data)
 
     def __mul__(self, other):
-        # Проверяем, является ли other тензором
-        if isinstance(other, Tensor):
-            if self.autograd and other.autograd:
-                return Tensor(self.data * other.data, autograd=True, creators=[self, other], creation_op="mul")
-            return Tensor(self.data * other.data)
-        else:
-            # Если other - число или numpy массив
-            return Tensor(self.data * other)
+        if self.autograd and other.autograd:
+            return Tensor(self.data * other.data, autograd=True, creators=[self, other], creation_op="mul")
+        return Tensor(self.data * other.data)
 
     def sum(self, dim):
         if self.autograd:
@@ -183,9 +166,9 @@ class Tensor(object):
         return Tensor(np.tanh(self.data))
 
     def softmax(self):
-        if self.autograd:
-            return Tensor(np.exp(self.data) / np.sum(np.exp(self.data), axis=1, keepdims=True),autograd=True, creators=[self], creation_op="softmax")
-        return Tensor(np.exp(self.data) / np.sum(np.exp(self.data), axis=1, keepdims=True))
+        temp = np.exp(self.data)
+        softmax_output = temp / np.sum(temp,axis=len(self.data.shape)-1,keepdims=True)
+        return softmax_output
 
     def index_select(self, indices):
         if self.autograd:
@@ -198,19 +181,21 @@ class Tensor(object):
         return Tensor(self.data[indices.data])
 
     def cross_entropy(self, target_indices):
-        softmax_output = np.exp(self.data) / np.sum(np.exp(self.data), axis=len(self.data.shape)-1, keepdims=True)
+        temp = np.exp(self.data)
+        softmax_output = temp / np.sum(temp,axis=len(self.data.shape)-1,keepdims=True)
 
         t = target_indices.data.flatten()
         p = softmax_output.reshape(len(t),-1)
 
         target_dist = np.eye(p.shape[1])[t]
-        loss = -(np.log(p) * target_dist).sum(1).mean()
+        loss = -(np.log(p) * (target_dist)).sum(1).mean()
 
-        if self.autograd:
+        if(self.autograd):
             out = Tensor(loss,autograd=True,creators=[self],creation_op="cross_entropy")
             out.softmax_output = softmax_output
             out.target_dist = target_dist
             return out
+
         return Tensor(loss)
 
 class SGD(object):
@@ -240,19 +225,27 @@ class Layer(object):
 
 
 class Linear(Layer):
-    def __init__(self, n_inputs, n_outputs):
+    def __init__(self, n_inputs, n_outputs, bias=True):
         super().__init__()
+
+        self.use_bias = bias
 
         W = np.random.randn(n_inputs, n_outputs) * np.sqrt(2.0/n_inputs)
 
         self.weight = Tensor(W, autograd=True)
-        self.bias = Tensor(np.zeros(n_outputs), autograd=True)
+
+        if self.use_bias:
+            self.bias = Tensor(np.zeros(n_outputs), autograd=True)
 
         self.tensors.append(self.weight)
-        self.tensors.append(self.bias)
+
+        if self.use_bias:
+            self.tensors.append(self.bias)
 
     def forward(self, input):
-        return input.mm(self.weight) + self.bias.expand(0, len(input.data))
+        if self.use_bias:
+            return input.mm(self.weight)+self.bias.expand(0,len(input.data))
+        return input.mm(self.weight)
 
 
 class Embedding(Layer):
@@ -263,6 +256,7 @@ class Embedding(Layer):
         self.dim = dim
 
         self.weight = Tensor((np.random.rand(vocab_size, dim) - 0.5) / dim, autograd=True)
+
         self.tensors.append(self.weight)
 
     def forward(self, input):
@@ -280,7 +274,7 @@ class RNNCell(Layer):
         if activation == 'sigmoid':
             self.activation = Sigmoid()
         elif activation == 'tanh':
-            self.activation == Tanh()
+            self.activation = Tanh()
         else:
             raise Exception("Функция активации не найдена")
 
@@ -293,7 +287,9 @@ class RNNCell(Layer):
         self.tensors += self.w_ho.get_tensors()
 
     def forward(self, input, hidden):
-        combined = self.w_ih.forward(input) + self.w_hh.forward(hidden)
+        from_prev_hidden = self.w_hh.forward(hidden)
+
+        combined = self.w_ih.forward(input) + from_prev_hidden
 
         new_hidden = self.activation.forward(combined)
 
@@ -303,6 +299,7 @@ class RNNCell(Layer):
 
     def init_hidden(self, batch_size=1):
         return Tensor(np.zeros((batch_size, self.n_hide)), autograd=True)
+
 
 class Sequential(Layer):
     def __init__(self, layers = list()):
@@ -323,14 +320,6 @@ class Sequential(Layer):
         for l in self.layers:
             params += l.get_tensors()
         return params
-
-
-class MSELoss(Layer):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, pred, target):
-        return ((pred - target)*(pred-target)).sum(0)
 
 
 class CrossEntropyLoss(object):
