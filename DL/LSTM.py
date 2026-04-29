@@ -14,7 +14,8 @@ word2index = {word: i for i, word in enumerate(vocab)}
 indices = np.array(list(map(lambda x: word2index[x], raw)))
 
 embed = Embedding(vocab_size=len(vocab), dim=512)
-model = RNNCell(n_in=512, n_hide=512, n_out=len(vocab))
+model = LSTMCell(n_in=512, n_hide=512, n_out=len(vocab))
+model.w_ho.weight.data *= 0
 
 criterion = CrossEntropyLoss()
 
@@ -33,8 +34,8 @@ def generate_sample(n=30, init_char=' '):
         s += c
     return s
 
-batch_size = 32
-bptt = 16
+batch_size = 16
+bptt = 25
 n_batches = int((indices.shape[0] / (batch_size)))
 
 trimmed_indices = indices[:n_batches*batch_size]
@@ -50,7 +51,7 @@ target_batches = target_batched_indices[:n_bptt*bptt].reshape(n_bptt, bptt, batc
 
 def train(iterations=100):
     for iter in range(iterations):
-        total_loss = 0
+        total_loss, n_loss = 0, 0
 
         hidden = model.init_hidden(batch_size)
 
@@ -58,7 +59,7 @@ def train(iterations=100):
 
             losses = list()
 
-            hidden = Tensor(hidden.data, autograd=True)
+            hidden = (Tensor(hidden[0].data, autograd=True), Tensor(hidden[1].data, autograd=True))
 
             for t in range(bptt):
                 input = Tensor(input_batches[batch_i][t], autograd=True)
@@ -71,21 +72,24 @@ def train(iterations=100):
 
                 batch_loss = criterion.forward(output, target)
 
-                losses.append(batch_loss)
+                if t == 0:
+                    losses.append(batch_loss)
+                else:
+                    losses.append(batch_loss + losses[-1])
 
             losses[-1].backward()
             optim.step()
 
-            total_loss += losses[-1].data
-
+            total_loss += losses[-1].data / bptt
             epoch_loss = np.exp(total_loss / (batch_i + 1))
 
-            log = "\r Iter:" + str(iter)
-            log += " - Alpha:" + str(optim.alpha)[0:5]
-            log += " - Batch "+str(batch_i+1)+"/"+str(len(input_batches))
-            log += " - Loss:" + str(epoch_loss)
-            log += " - " + generate_sample(n=30, init_char='\n').replace("\n"," ")
-            sys.stdout.write(log)
+            if batch_i % 5 == 0:
+                log = "\r Iter:" + str(iter)
+                log += " - Alpha:" + str(optim.alpha)[0:5]
+                log += " - Batch "+str(batch_i)+"/"+str(len(input_batches))
+                log += " - Loss:" + str(epoch_loss)
+                log += " - " + generate_sample(n=30, init_char='\n').replace("\n"," ")
+                sys.stdout.write(log)
 
         optim.alpha *= 0.99
         print()

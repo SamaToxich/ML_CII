@@ -301,6 +301,60 @@ class RNNCell(Layer):
         return Tensor(np.zeros((batch_size, self.n_hide)), autograd=True)
 
 
+class LSTMCell(Layer):
+    def __init__(self, n_in, n_hide, n_out):
+        super().__init__()
+
+        self.n_in = n_in
+        self.n_hide = n_hide
+        self.n_out = n_out
+
+        self.xf = Linear(n_in, n_hide)
+        self.xi = Linear(n_in, n_hide)
+        self.xo = Linear(n_in, n_hide)
+        self.xc = Linear(n_in, n_hide)
+        self.hf = Linear(n_hide, n_hide, bias=False)
+        self.hi = Linear(n_hide, n_hide, bias=False)
+        self.ho = Linear(n_hide, n_hide, bias=False)
+        self.hc = Linear(n_hide, n_hide, bias=False)
+
+        self.w_ho = Linear(n_hide, n_out, bias=False)
+
+        self.tensors += self.xf.get_tensors()
+        self.tensors += self.xi.get_tensors()
+        self.tensors += self.xo.get_tensors()
+        self.tensors += self.xc.get_tensors()
+        self.tensors += self.hf.get_tensors()
+        self.tensors += self.hi.get_tensors()
+        self.tensors += self.ho.get_tensors()
+        self.tensors += self.hc.get_tensors()
+
+        self.tensors += self.w_ho.get_tensors()
+
+    def forward(self, input, hidden):
+        prev_hidden = hidden[0]
+        prev_cell = hidden[1]
+
+        f = (self.xf.forward(input) + self.hf.forward(prev_hidden)).sigmoid() # forget
+        i = (self.xi.forward(input) + self.hi.forward(prev_hidden)).sigmoid() # input
+        o = (self.xo.forward(input) + self.ho.forward(prev_hidden)).sigmoid() # output
+        u = (self.xc.forward(input) + self.hc.forward(prev_hidden)).tanh() # update
+
+        c = (f * prev_cell) + (i * u)
+        h = o * c.tanh()
+
+        out = self.w_ho.forward(h)
+        return out, (h, c)
+
+    def init_hidden(self, batch_size=1):
+        h = Tensor(np.zeros((batch_size, self.n_hide)), autograd=True)
+        c = Tensor(np.zeros((batch_size, self.n_hide)), autograd=True)
+        h.data[:,0] += 1
+        c.data[:,0] += 1
+
+        return (h, c)
+
+
 class Sequential(Layer):
     def __init__(self, layers = list()):
         super().__init__()
