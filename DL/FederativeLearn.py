@@ -74,4 +74,5 @@ for i in range(max(len(test_spam_idx), len(test_ham_idx))):
     test_target.append([0])
 
 
-def train(model, input_data)
+def train(model, input_data):
+    pass
