@@ -84,20 +84,15 @@ for iter in range(1000):
 
 # Тест
 batch_size = 1
-
 hidden = model.init_hidden(batch_size)
 
 for t in range(5):
     input = Tensor(data[0:batch_size,t], autograd=True)
-
     rnn_input = embed.forward(input)
-
     output, hidden = model.forward(rnn_input, hidden)
 
 target = Tensor(data[0:batch_size, t+1], autograd=True)
-
 loss = criterion.forward(output, target)
-
 ctx = ""
 
 for i in data[0:batch_size][0][0:-1]:
