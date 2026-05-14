@@ -198,6 +198,7 @@ class Tensor(object):
 
         return Tensor(loss)
 
+
 class SGD(object):
     def __init__(self, tensors, alpha=0.1):
         self.tensors = tensors
@@ -382,6 +383,16 @@ class CrossEntropyLoss(object):
 
     def forward(self, input, target):
         return input.cross_entropy(target)
+
+
+class MSELoss(object):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, input, target):
+        dif = input - target
+        return (dif * dif).sum(0)
 
 
 class Tanh(Layer):

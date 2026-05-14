@@ -1,5 +1,6 @@
 import random, sys, codecs
 import numpy as np
+from MLFrameWork import *
 
 np.random.seed(12345)
 
@@ -73,6 +74,50 @@ for i in range(max(len(test_spam_idx), len(test_ham_idx))):
     test_data.append(test_ham_idx[i % len(test_ham_idx)])
     test_target.append([0])
 
+def train(model, input_data, target_data, bs=500, iterations=5):
+    n_batches = int(len(input_data) / bs)
 
-def train(model, input_data):
-    pass
+    for iter in range(iterations):
+        iter_loss = 0
+
+        for b_i in range(n_batches):
+
+            model.weight.data[w2i['<unk>']] *= 0
+
+            input = Tensor(input_data[b_i*bs:(b_i+1)*bs], autograd=True)
+            target = Tensor(target_data[b_i*bs:(b_i+1)*bs], autograd=True)
+
+            pred = model.forward(input).sum(1).sigmoid()
+
+            loss = criterion.forward(pred, target)
+
+            loss.backward()
+
+            optim.step()
+
+            iter_loss += loss.data[0] / bs
+
+            sys.stdout.write("\r\tLoss:" + str(iter_loss / (b_i + 1)))
+        print()
+    return model
+
+def test(model, test_input, test_output):
+    model.weight.data[w2i['<unk>']] *= 0
+
+    input = Tensor(test_input, autograd=True)
+    target = Tensor(test_output, autograd=True)
+
+    pred = model.forward(input).sum(1).sigmoid()
+
+    return ((pred.data > 0.5) == target.data).mean()
+
+model = Embedding(vocab_size=len(vocab), dim=1)
+model.weight.data *= 0
+
+criterion = MSELoss()
+
+optim = SGD(model.get_tensors(), 0.01)
+
+for i in range(3):
+    model = train(model, train_data, train_target, iteration=1)
+    print("% Correct on Test Set: " + str(test(model, test_data, test_target)*100))
